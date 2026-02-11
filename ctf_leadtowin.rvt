@@ -10,6 +10,7 @@ alias opt_sides                = script_option[2] -- see (sides) enum
 alias opt_flag_at_home         = script_option[3]
 alias opt_carrier_cooldown     = script_option[4]
 alias opt_flag_preserve_radius = script_option[6] -- range option; not visible in UI; defaults to 20
+alias opt_lead_to_win          = script_option[7]
 -- script_option[5] is an unused range option; not visible in UI; defaults to 7
 
 -- Unnamed Forge labels:
@@ -33,6 +34,8 @@ end
 alias sudden_death_enabled        = global.number[0]
 alias announced_sudden_death      = global.number[1]
 alias any_flag_is_being_preserved = global.number[2] -- is set, but nothing ever uses it
+alias red_team                    = global.team[1]
+alias blue_team                   = global.team[2]
 
 alias announced_game_start       = player.number[0]
 alias is_returning_flag          = player.number[1]
@@ -62,6 +65,8 @@ declare global.object[1] with network priority local
 declare global.player[0] with network priority local
 declare global.player[1] with network priority local
 declare global.team[0] with network priority local
+declare red_team  with network priority local = team[0]
+declare blue_team with network priority local = team[1]
 
 declare player.announced_game_start with network priority low
 declare player.is_returning_flag with network priority low
@@ -92,6 +97,21 @@ on pregame: do
    end
 end
 
+on init: do
+   alias is_odd = global.number[3]
+   --
+   is_odd = game.current_round
+   is_odd %= 2
+   if is_odd == 0 then
+      red_team  = team[0]
+      blue_team = team[1]
+   end
+   if is_odd != 0 then
+      red_team  = team[1]
+      blue_team = team[0]
+   end
+end
+
 for each player do -- loadout palettes
    if current_player.is_elite() then 
       current_player.set_loadout_palette(elite_tier_1)
@@ -114,10 +134,20 @@ for each player do -- round card
       current_player.set_objective_allegiance_icon(defend)
    end
    if game.score_to_win != 0 and opt_sides == sides.neutral or opt_sides == sides.multi then 
-      current_player.set_objective_text("Capture the flag.\r\n%n points to win.", game.score_to_win)
+      if opt_lead_to_win > 0 then
+         current_player.set_objective_text("Capture the flag.\r\n%n point lead or %n points to win.", opt_lead_to_win, game.score_to_win)
+      end
+      if opt_lead_to_win == 0 then
+         current_player.set_objective_text("Capture the flag.\r\n%n points to win.", game.score_to_win)
+      end
    end
    if game.score_to_win == 0 and opt_sides == sides.neutral or opt_sides == sides.multi then 
-      current_player.set_objective_text("Capture the flag.")
+      if opt_lead_to_win > 0 then
+         current_player.set_objective_text("Capture the flag.\r\n%n point lead to win.", opt_lead_to_win)
+      end
+      if opt_lead_to_win == 0 then
+         current_player.set_objective_text("Capture the flag.")
+      end
    end
 end
 
@@ -286,6 +316,26 @@ for each team do -- manage flag carrier, flag state, flag waypoint, flag capture
             flag_carrier.captures += 1
             current_team.flag.delete()
             send_incident(flag_scored, flag_carrier, all_players)
+            if opt_lead_to_win > 0 then -- handle lead-to-win
+               alias lead_score = global.number[4]
+               --
+               lead_score = red_team.score
+               lead_score -= blue_team.score
+               if lead_score >= 1 then
+                  game.show_message_to(all_players, none, "Red Team has a %n point lead!", lead_score)
+                  if lead_score >= opt_lead_to_win then
+                     game.end_round()
+                  end
+               end
+               lead_score = blue_team.score
+               lead_score -= red_team.score
+               if lead_score >= 1 then
+                  game.show_message_to(all_players, none, "Blue Team has a %n point lead!", lead_score)
+                  if lead_score >= opt_lead_to_win then
+                     game.end_round()
+                  end
+               end
+            end
          end
       end
    end
