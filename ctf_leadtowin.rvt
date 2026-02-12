@@ -34,8 +34,6 @@ end
 alias sudden_death_enabled        = global.number[0]
 alias announced_sudden_death      = global.number[1]
 alias any_flag_is_being_preserved = global.number[2] -- is set, but nothing ever uses it
-alias red_team                    = global.team[1]
-alias blue_team                   = global.team[2]
 
 alias announced_game_start       = player.number[0]
 alias is_returning_flag          = player.number[1]
@@ -65,8 +63,6 @@ declare global.object[1] with network priority local
 declare global.player[0] with network priority local
 declare global.player[1] with network priority local
 declare global.team[0] with network priority local
-declare red_team  with network priority local = team[0]
-declare blue_team with network priority local = team[1]
 
 declare player.announced_game_start with network priority low
 declare player.is_returning_flag with network priority low
@@ -94,21 +90,6 @@ on pregame: do
    game.symmetry = 1
    if opt_sides == sides.one then 
       game.symmetry = 0
-   end
-end
-
-on init: do
-   alias is_odd = global.number[3]
-   --
-   is_odd = game.current_round
-   is_odd %= 2
-   if is_odd == 0 then
-      red_team  = team[0]
-      blue_team = team[1]
-   end
-   if is_odd != 0 then
-      red_team  = team[1]
-      blue_team = team[0]
    end
 end
 
@@ -317,20 +298,33 @@ for each team do -- manage flag carrier, flag state, flag waypoint, flag capture
             current_team.flag.delete()
             send_incident(flag_scored, flag_carrier, all_players)
             if opt_lead_to_win > 0 then -- handle lead-to-win
+               alias is_odd     = global.number[3]
                alias lead_score = global.number[4]
                --
-               lead_score = red_team.score
-               lead_score -= blue_team.score
-               if lead_score >= 1 then
-                  game.show_message_to(all_players, none, "Red Team has a %n point lead!", lead_score)
+               is_odd = game.current_round
+               is_odd %= 2
+               lead_score = team[0].score
+               lead_score -= team[1].score
+               if lead_score > 0 then
+                  if is_odd == 0 then
+                     game.show_message_to(all_players, none, "Red Team has a %n point lead!", lead_score)
+                  end
+                  if is_odd != 0 then
+                     game.show_message_to(all_players, none, "Blue Team has a %n point lead!", lead_score)
+                  end
                   if lead_score >= opt_lead_to_win then
                      game.end_round()
                   end
                end
-               lead_score = blue_team.score
-               lead_score -= red_team.score
-               if lead_score >= 1 then
-                  game.show_message_to(all_players, none, "Blue Team has a %n point lead!", lead_score)
+               lead_score = team[1].score
+               lead_score -= team[0].score
+               if lead_score > 0 then
+                  if is_odd == 0 then
+                     game.show_message_to(all_players, none, "Blue Team has a %n point lead!", lead_score)
+                  end
+                  if is_odd != 0 then
+                     game.show_message_to(all_players, none, "Red Team has a %n point lead!", lead_score)
+                  end
                   if lead_score >= opt_lead_to_win then
                      game.end_round()
                   end
